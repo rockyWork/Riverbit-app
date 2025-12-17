@@ -32,36 +32,49 @@ class MainNavigationPage extends StatefulWidget {
   State<MainNavigationPage> createState() => _MainNavigationPageState();
 }
 
-class _MainNavigationPageState extends State<MainNavigationPage> {
+class _MainNavigationPageState extends State<MainNavigationPage> with WidgetsBindingObserver {
   int _currentIndex = 0;
   late WalletService _walletService;
+  late List<Widget> _pages;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _walletService = WalletService();
     _walletService.addListener(_onWalletStateChanged);
+    // 初始化页面列表，避免每次重建时创建新实例
+    _pages = [
+      HomePage(
+        walletService: _walletService,
+      ),
+      const MarketPage(),
+      const VaultPage(),
+      const ProfilePage(),
+    ];
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _walletService.removeListener(_onWalletStateChanged);
     _walletService.dispose();
     super.dispose();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    // 当应用从后台回到前台时，检查连接状态
+    if (state == AppLifecycleState.resumed) {
+      debugPrint('App resumed, checking wallet connection status...');
+      _walletService.checkConnectionStatus();
+    }
+  }
+
   void _onWalletStateChanged() {
     setState(() {});
   }
-
-  List<Widget> get _pages => [
-        HomePage(
-          walletService: _walletService,
-        ),
-        const MarketPage(),
-        const VaultPage(),
-        const ProfilePage(),
-      ];
 
   final List<String> _titles = const [
     'Home',

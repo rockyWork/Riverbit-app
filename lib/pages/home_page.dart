@@ -18,9 +18,9 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   // 区块链热点图片URL - 使用可靠的图片链接
   static const List<String> _carouselImages = [
-    'https://via.placeholder.com/800x400/4A90E2/FFFFFF?text=Blockchain+News+1',
-    'https://via.placeholder.com/800x400/7B68EE/FFFFFF?text=Crypto+Market+2',
-    'https://via.placeholder.com/800x400/50C878/FFFFFF?text=DeFi+Trends+3',
+    'https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=1200&auto=format&fit=crop', // 加密货币/区块链主题
+    'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1200&auto=format&fit=crop', // 数字金融主题
+    'https://images.unsplash.com/photo-1620321023374-d1a68fbc720d?w=1200&auto=format&fit=crop', // 科技金融主题
   ];
 
   List<Map<String, String>> _tokenBalances = [];
@@ -42,11 +42,17 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _loadBalances() {
+    debugPrint('=== _loadBalances called ===');
+    debugPrint('isConnected: ${widget.walletService.isConnected}');
+    debugPrint('address: ${widget.walletService.address}');
+    
     if (widget.walletService.isConnected) {
+      debugPrint('Wallet is connected, loading balances...');
       setState(() {
         _isLoadingBalances = true;
       });
       widget.walletService.getTokenBalances().then((balances) {
+        debugPrint('Token balances received: $balances');
         if (mounted) {
           setState(() {
             _tokenBalances = balances.map((b) => {
@@ -55,8 +61,11 @@ class _HomePageState extends State<HomePage> {
             }).toList();
             _isLoadingBalances = false;
           });
+          debugPrint('Token balances updated in UI: $_tokenBalances');
         }
       }).catchError((error) {
+        debugPrint('Error loading balances: $error');
+        debugPrint('Stack trace: ${StackTrace.current}');
         if (mounted) {
           setState(() {
             _isLoadingBalances = false;
@@ -64,6 +73,7 @@ class _HomePageState extends State<HomePage> {
         }
       });
     } else {
+      debugPrint('Wallet is not connected, clearing balances');
       setState(() {
         _tokenBalances = [];
         _isLoadingBalances = false;
@@ -95,13 +105,76 @@ class _HomePageState extends State<HomePage> {
                   : _tokenBalances,
               address: walletService.address,
             )
-          else
-            const Padding(
-              padding: EdgeInsets.all(16.0),
+          else if (walletService.isConnecting || walletService.isSigning)
+            Padding(
+              padding: const EdgeInsets.all(16.0),
               child: Center(
-                child: Text(
-                  '请连接钱包以查看余额',
-                  style: TextStyle(fontSize: 16, color: Colors.grey),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const CircularProgressIndicator(),
+                    const SizedBox(height: 16),
+                    Text(
+                      walletService.isSigning ? '正在请求签名授权...' : '正在连接钱包...',
+                      style: const TextStyle(fontSize: 16, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      walletService.isSigning 
+                          ? '请在 MetaMask 中确认签名'
+                          : '请在 MetaMask 中确认连接',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    if (walletService.connectionError != null) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          walletService.connectionError!,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.red.shade700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.account_balance_wallet_outlined,
+                      size: 64,
+                      color: Colors.grey.shade400,
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      '请连接钱包以查看余额',
+                      style: TextStyle(fontSize: 16, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '点击右上角"连接钱包"按钮',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),

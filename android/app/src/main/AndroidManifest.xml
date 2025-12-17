@@ -44,10 +44,17 @@
         </intent>
         <!-- 支持打开 MetaMask 应用 -->
         <package android:name="io.metamask" />
+        <!-- MetaMask 深度链接协议 -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="metamask" />
+        </intent>
+        <!-- WalletConnect 协议 -->
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="walletconnect" />
         </intent>
+        <!-- HTTPS 协议 -->
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="https" />
