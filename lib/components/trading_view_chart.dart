@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
-import 'dart:convert';
 
 class TradingViewChart extends StatefulWidget {
   final String symbol;
@@ -75,9 +74,9 @@ class _TradingViewChartState extends State<TradingViewChart> {
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <style>
-    body { margin: 0; padding: 0; height: 100vh; width: 100vw; overflow: hidden; background-color: #ffffff; }
+    body { margin: 0; padding: 0; height: 100vh; width: 100vw; overflow: hidden; background-color: #131722; }
     #tradingview_container { height: 100vh; width: 100vw; display: flex; justify-content: center; align-items: center; }
-    .loading-text { font-family: sans-serif; color: #999; }
+    .loading-text { font-family: sans-serif; color: #666; }
   </style>
 </head>
 <body>
@@ -105,25 +104,25 @@ class _TradingViewChartState extends State<TradingViewChart> {
       }
 
       try {
-        log("Initializing TradingView widget...");
+        log("Initializing TradingView widget (dark theme)...");
         new TradingView.widget({
           "autosize": true,
           "symbol": "$tvSymbol",
           "interval": "D",
           "timezone": "Etc/UTC",
-          "theme": "light",
+          "theme": "dark",
           "style": "1",
           "locale": "zh_CN",
-          "toolbar_bg": "#f1f3f6",
+          "toolbar_bg": "#131722",
           "enable_publishing": false,
           "allow_symbol_change": false,
           "container_id": "tradingview_container",
           "hide_top_toolbar": true,
           "save_image": false,
-          "backgroundColor": "rgba(255, 255, 255, 1)",
-          "gridColor": "rgba(240, 243, 250, 0.06)",
+          "backgroundColor": "#131722",
+          "gridColor": "rgba(42, 46, 57, 0.6)",
         });
-        log("TradingView widget initialized");
+        log("TradingView widget initialized in dark mode");
       } catch (e) {
         log("Error initializing TradingView: " + e.toString());
       }
