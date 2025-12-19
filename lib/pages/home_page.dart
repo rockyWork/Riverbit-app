@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../components/carousel.dart';
 import '../components/vault/vault_content.dart';
 import '../services/wallet_service.dart';
+import 'ai_order_page.dart';
 
 class HomePage extends StatefulWidget {
   final WalletService walletService;
@@ -94,7 +95,60 @@ class _HomePageState extends State<HomePage> {
             imageUrls: _carouselImages,
             height: 200,
           ),
-          const SizedBox(height: 20),
+          
+          // AI 下单按钮区域
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Container(
+              width: double.infinity,
+              height: 56,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.blue.shade700, Colors.blue.shade400],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                ),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.blue.withOpacity(0.3),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const AiOrderPage()),
+                    );
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.auto_awesome, color: Colors.white),
+                      SizedBox(width: 8),
+                      Text(
+                        'AI 下单',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 4),
           // 钱包信息（仅在连接时显示）
           if (walletService.isConnected)
             VaultContentWidget(
