@@ -12,7 +12,6 @@ class WalletService extends ChangeNotifier {
   SessionData? _session;
   Web3Client? _web3Client;
   Timer? _pollingTimer;
-  String? _pendingPairingTopic; // 跟踪待处理的配对
 
   bool _isInitializing = false;
   bool _isConnecting = false;
@@ -48,92 +47,42 @@ class WalletService extends ChangeNotifier {
     _isInitializing = true;
     try {
       _addLog('🚀 初始化 Web3App...');
-      
       _wc = await Web3App.createInstance(
         projectId: _projectId,
         relayUrl: _relayUrl,
         metadata: const PairingMetadata(
-          name: 'RiverBit DEX',
-          description: 'RiverBit Decentralized Exchange',
+          name: 'RiverBit',
+          description: 'DEX',
           url: 'https://riverbit.com',
-          icons: ['https://riverbit.com/favicon.ico'],
+          icons: [], // 留空防止崩溃
           redirect: Redirect(native: 'riverbit://'),
         ),
       );
 
-      // 设置事件监听器
-      _setupEventListeners();
+      _wc!.onSessionConnect.subscribe((SessionConnect? args) {
+        _addLog('🎯 收到授权成功信号！');
+        if (args != null) _handleSession(args.session);
+      });
 
-      // 尝试恢复已有会话
-      await _restoreExistingSessions();
-      
-      _addLog('✅ Web3App 初始化完成');
-    } catch (e, stackTrace) {
+      _wc!.core.relayClient.onRelayClientConnect.subscribe((_) {
+        _addLog('🌐 信令已连接');
+      });
+
+      await _refreshActiveSession();
+    } catch (e) {
       _addLog('❌ 初始化失败: $e');
-      _addLog('堆栈: ${stackTrace.toString().split('\n').first}');
     } finally {
       _isInitializing = false;
       notifyListeners();
     }
   }
 
-  void _setupEventListeners() {
+  Future<void> _refreshActiveSession() async {
     if (_wc == null) return;
-
-    // 会话连接事件
-    _wc!.onSessionConnect.subscribe((SessionConnect? args) {
-      _addLog('🎯 收到 SessionConnect 事件');
-      if (args != null) {
-        _stopPolling();
-        _handleSession(args.session);
-      }
-    });
-
-    // 会话更新事件
-    _wc!.onSessionUpdate.subscribe((SessionUpdate? args) {
-      _addLog('🔄 收到 SessionUpdate 事件');
-      if (args != null && _session?.topic == args.topic) {
-        _refreshSessionData();
-      }
-    });
-
-    // 会话删除事件
-    _wc!.onSessionDelete.subscribe((SessionDelete? args) {
-      _addLog('🗑️ 收到 SessionDelete 事件');
-      _disconnectInternal();
-    });
-
-    // Relay 连接状态
-    _wc!.core.relayClient.onRelayClientConnect.subscribe((_) {
-      _addLog('🌐 Relay 已连接');
-    });
-
-    _wc!.core.relayClient.onRelayClientError.subscribe((args) {
-      _addLog('🌐 Relay 错误: ${args?.error}');
-    });
-  }
-
-  Future<void> _restoreExistingSessions() async {
-    if (_wc == null) return;
-    
     final sessions = _wc!.sessions.getAll();
-    final pairings = _wc!.pairings.getAll();
-    
-    _addLog('📊 恢复检查: ${sessions.length} 个会话, ${pairings.length} 个配对');
-    
-    for (var session in sessions) {
-      final expiry = session.expiry;
-      // expiry 是秒级时间戳
-      if (expiry != null && DateTime.fromMillisecondsSinceEpoch(expiry * 1000).isBefore(DateTime.now())) {
-        continue;
-      }
-      
-      final eip155 = session.namespaces['eip155'];
-      if (eip155 != null && eip155.accounts.isNotEmpty) {
-        _addLog('✅ 恢复有效会话');
-        _handleSession(session);
-        return;
-      }
+    if (sessions.isNotEmpty) {
+      _addLog('✅ 自动恢复会话');
+      _handleSession(sessions.first);
     }
   }
 
@@ -145,23 +94,25 @@ class WalletService extends ChangeNotifier {
       _isConnecting = true;
       _connectionError = null;
       debugLogs.clear();
-      _addLog('🚀 开始连接流程...');
+      _addLog('🚀 发起【防崩溃】连接请求...');
       notifyListeners();
 
+      // 清理旧 Pairing
+      for (var p in _wc!.pairings.getAll()) {
+        await _wc!.core.pairing.disconnect(topic: p.topic);
+      }
+
       if (!_wc!.core.relayClient.isConnected) {
-        _addLog('⏳ 等待 Relay 连接...');
+        await _wc!.core.relayClient.connect();
         await Future.delayed(const Duration(seconds: 1));
       }
 
-      await _cleanupOldConnections();
-
-      _addLog('📡 请求连接...');
-      
+      // 【核心修复】使用极简配置，防止小狐狸 React Native 引擎崩溃
       final connectResp = await _wc!.connect(
-        requiredNamespaces: {
+        optionalNamespaces: {
           'eip155': RequiredNamespace(
-            chains: ['eip155:1', 'eip155:56', 'eip155:137'],
-            methods: ['eth_sendTransaction', 'personal_sign', 'eth_signTypedData_v4'],
+            chains: ['eip155:1'], // 仅请求主网
+            methods: ['personal_sign'], // 仅请求最基础的签名权限，规避崩溃
             events: ['chainChanged', 'accountsChanged'],
           ),
         },
@@ -169,115 +120,41 @@ class WalletService extends ChangeNotifier {
 
       final uri = connectResp.uri;
       if (uri == null) {
-        _addLog('❌ 无法生成连接 URI');
+        _addLog('❌ URI 生成失败');
         _isConnecting = false;
         return false;
       }
 
-      _pendingPairingTopic = connectResp.pairingTopic;
-      _addLog('🔗 URI 生成成功');
+      _addLog('📱 跳转小狐狸...');
+      final uriString = Uri.encodeComponent(uri.toString());
+      await launchUrl(
+        Uri.parse('metamask://wc?uri=$uriString'),
+        mode: LaunchMode.externalApplication,
+      );
 
-      final launched = await _launchWalletApp(uri.toString());
-      if (!launched) {
-        _addLog('❌ 无法唤起钱包');
-        _isConnecting = false;
-        _connectionError = '无法唤起 MetaMask';
-        notifyListeners();
-        return false;
-      }
-
-      _addLog('⏳ 等待钱包授权...');
       _startPolling();
+
+      // 等待授权
+      final session = await connectResp.session.future.timeout(
+        const Duration(minutes: 3),
+        onTimeout: () => throw TimeoutException('等待授权超时'),
+      );
       
-      try {
-        final session = await connectResp.session.future.timeout(
-          const Duration(seconds: 45),
-          onTimeout: () => throw TimeoutException('Future timeout'),
-        );
-        _stopPolling();
-        _handleSession(session);
-        return true;
-      } on TimeoutException {
-        _addLog('切换到轮询检查模式');
-        return true;
-      }
+      _handleSession(session);
+      return true;
     } catch (e) {
-      _addLog('❌ 连接出错: $e');
+      _addLog('❌ 连接异常: $e');
       _isConnecting = false;
+      _stopPolling();
       notifyListeners();
       return false;
     }
   }
 
-  Future<bool> _launchWalletApp(String uri) async {
-    final encodedUri = Uri.encodeComponent(uri);
-    final metamaskUrl = Uri.parse('metamask://wc?uri=$encodedUri');
-    
-    try {
-      if (await canLaunchUrl(metamaskUrl)) {
-        return await launchUrl(metamaskUrl, mode: LaunchMode.externalApplication);
-      }
-      final universalUrl = Uri.parse('https://metamask.app.link/wc?uri=$encodedUri');
-      return await launchUrl(universalUrl, mode: LaunchMode.externalApplication);
-    } catch (e) {
-      _addLog('唤起失败: $e');
-      return false;
-    }
-  }
-
-  Future<void> _cleanupOldConnections() async {
-    if (_wc == null) return;
-    try {
-      final pairings = _wc!.pairings.getAll();
-      for (var pairing in pairings) {
-        await _wc!.core.pairing.disconnect(topic: pairing.topic);
-      }
-    } catch (_) {}
-  }
-
-  void _startPolling() {
-    _stopPolling();
-    int pollCount = 0;
-    _pollingTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
-      pollCount++;
-      if (!_isConnecting || isConnected || pollCount > 30) {
-        timer.cancel();
-        if (pollCount > 30) {
-          _isConnecting = false;
-          _connectionError = '连接超时';
-          notifyListeners();
-        }
-        return;
-      }
-      _addLog('🔄 轮询检查 ($pollCount/30)...');
-      _checkActiveConnections();
-    });
-  }
-
-  void _checkActiveConnections() {
-    if (_wc == null) return;
-    final sessions = _wc!.sessions.getAll();
-    if (sessions.isNotEmpty) {
-      for (var session in sessions) {
-        final eip155 = session.namespaces['eip155'];
-        if (eip155 != null && eip155.accounts.isNotEmpty) {
-          _addLog('✅ 轮询发现有效会话');
-          _stopPolling();
-          _handleSession(session);
-          break;
-        }
-      }
-    }
-  }
-
-  void _stopPolling() {
-    _pendingPairingTopic = null;
-    _pollingTimer?.cancel();
-    _pollingTimer = null;
-  }
-
   void _handleSession(SessionData session) {
     _session = session;
+    _addLog('📦 解析账户...');
+    
     final eip155 = session.namespaces['eip155'];
     if (eip155 != null && eip155.accounts.isNotEmpty) {
       final account = eip155.accounts.first;
@@ -285,29 +162,39 @@ class WalletService extends ChangeNotifier {
       if (parts.length >= 3) {
         _chainId = int.tryParse(parts[1]);
         _address = parts[2];
-        _addLog('✅ 地址: ${_address?.substring(0, 10)}...');
+        _addLog('✅ 获取地址成功: ${_address?.substring(0, 10)}...');
       }
     }
 
     _isConnecting = false;
+    _stopPolling();
     _updateNetworkName();
     _initializeWeb3Client();
-    _addLog('🎉 连接成功！');
+    _addLog('🎉 连接成功');
     notifyListeners();
   }
 
-  void _refreshSessionData() {
-    final sessions = _wc?.sessions.getAll();
-    if (sessions != null && sessions.isNotEmpty) {
-      _handleSession(sessions.first);
-    }
+  void _startPolling() {
+    _stopPolling();
+    _pollingTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
+      if (isConnected) {
+        timer.cancel();
+        return;
+      }
+      _refreshActiveSession();
+    });
+  }
+
+  void _stopPolling() {
+    _pollingTimer?.cancel();
+    _pollingTimer = null;
   }
 
   void _updateNetworkName() {
     switch (_chainId) {
-      case 1: _networkName = 'Ethereum Mainnet'; break;
-      case 56: _networkName = 'BSC Mainnet'; break;
-      case 137: _networkName = 'Polygon Mainnet'; break;
+      case 1: _networkName = 'Ethereum'; break;
+      case 56: _networkName = 'BSC'; break;
+      case 137: _networkName = 'Polygon'; break;
       default: _networkName = 'Chain $_chainId';
     }
   }
@@ -321,9 +208,13 @@ class WalletService extends ChangeNotifier {
   }
 
   Future<void> checkConnectionStatus() async {
-    _addLog('🔄 检查状态');
+    _addLog('🔄 应用切回前台，同步状态');
     await _initClient();
-    await _restoreExistingSessions();
+    if (_wc != null && !_wc!.core.relayClient.isConnected) {
+      await _wc!.core.relayClient.connect();
+    }
+    await Future.delayed(const Duration(milliseconds: 1000));
+    await _refreshActiveSession();
   }
 
   Future<List<Map<String, String>>> getTokenBalances() async {
@@ -334,18 +225,12 @@ class WalletService extends ChangeNotifier {
       String symbol = (_chainId == 56) ? 'BNB' : (_chainId == 137 ? 'MATIC' : 'ETH');
       return [{'symbol': symbol, 'balance': val}];
     } catch (e) {
-      _addLog('❌ 余额失败: $e');
       return [];
     }
   }
 
   Future<void> disconnect() async {
     _addLog('🔌 断开连接');
-    await _disconnectInternal();
-  }
-
-  Future<void> _disconnectInternal() async {
-    _stopPolling();
     if (_session != null && _wc != null) {
       try {
         await _wc!.disconnectSession(
