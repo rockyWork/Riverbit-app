@@ -105,7 +105,7 @@ class _HomePageState extends State<HomePage> {
                   : _tokenBalances,
               address: walletService.address,
             )
-          else if (walletService.isConnecting || walletService.isSigning)
+          else if (walletService.isConnecting)
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Center(
@@ -113,19 +113,30 @@ class _HomePageState extends State<HomePage> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     const CircularProgressIndicator(),
-                    const SizedBox(height: 16),
-                    Text(
-                      walletService.isSigning ? '正在请求签名授权...' : '正在连接钱包...',
-                      style: const TextStyle(fontSize: 16, color: Colors.grey),
+                    const SizedBox(height: 24),
+                    const Text(
+                      '正在连接钱包...',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      walletService.isSigning 
-                          ? '请在 MetaMask 中确认签名'
-                          : '请在 MetaMask 中确认连接',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey.shade600,
+                    const SizedBox(height: 16),
+                    // 实时显示 WalletService 的日志内容
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('实时调试日志：', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                          const Divider(),
+                          ...walletService.debugLogs.reversed.take(5).map((log) => Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 2),
+                            child: Text(log, style: const TextStyle(fontSize: 11, color: Colors.blueGrey, fontFamily: 'monospace')),
+                          )),
+                        ],
                       ),
                     ),
                     if (walletService.connectionError != null) ...[
@@ -135,16 +146,44 @@ class _HomePageState extends State<HomePage> {
                         decoration: BoxDecoration(
                           color: Colors.red.shade50,
                           borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.red.shade300),
                         ),
-                        child: Text(
-                          walletService.connectionError!,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.red.shade700,
-                          ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              '连接失败',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.red,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              walletService.connectionError!,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.red.shade700,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              '请确保在 MetaMask 中完成了以下步骤：\n1. 点击"连接"按钮\n2. 选择账户\n3. 点击"授权"或"确认"',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.red,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      onPressed: () => walletService.checkConnectionStatus(),
+                      child: const Text('手动刷新状态'),
+                    ),
                   ],
                 ),
               ),
