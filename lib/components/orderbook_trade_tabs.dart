@@ -139,7 +139,8 @@ class _OrderBookTradeTabsState extends State<OrderBookTradeTabs> {
                 unselectedLabelColor: Colors.white70,
                 indicatorColor: const Color(0xFF4C7DFF),
                 indicatorWeight: 3,
-                labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                labelStyle:
+                    const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                 tabs: const [
                   Tab(text: 'Order Book'),
                   Tab(text: 'Trade'),
@@ -151,7 +152,8 @@ class _OrderBookTradeTabsState extends State<OrderBookTradeTabs> {
                 color: panel,
                 child: TabBarView(
                   children: [
-                    _OrderBookView(asks: _asks, bids: _bids, symbol: widget.symbol),
+                    _OrderBookView(
+                        asks: _asks, bids: _bids, symbol: widget.symbol),
                     _TradesView(trades: _trades),
                   ],
                 ),
@@ -178,8 +180,10 @@ class _OrderBookView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
-    final headerStyle = text.bodySmall?.copyWith(color: Colors.white70, fontSize: 11);
-    final cellStyle = text.bodyMedium?.copyWith(color: Colors.white, fontSize: 12);
+    final headerStyle =
+        text.bodySmall?.copyWith(color: Colors.white70, fontSize: 11);
+    final cellStyle =
+        text.bodyMedium?.copyWith(color: Colors.white, fontSize: 12);
 
     return Column(
       children: [
@@ -193,7 +197,7 @@ class _OrderBookView extends StatelessWidget {
             ],
           ),
         ),
-        const Divider(height: 1, thickness: 1, color: Color(0x221FFFFFF)),
+        const Divider(height: 1, thickness: 1, color: Color(0x221ffffff)),
         Expanded(
           child: Row(
             children: [
@@ -204,7 +208,8 @@ class _OrderBookView extends StatelessWidget {
                   cellStyle: cellStyle,
                 ),
               ),
-              const VerticalDivider(width: 1, thickness: 1, color: Color(0x221FFFFFF)),
+              const VerticalDivider(
+                  width: 1, thickness: 1, color: Color(0x221ffffff)),
               Expanded(
                 child: _OrderList(
                   rows: bids,
@@ -240,7 +245,8 @@ class _OrderList extends StatelessWidget {
       itemCount: rows.length,
       itemBuilder: (context, index) {
         final r = rows[index];
-        final pct = (maxTotal <= 0) ? 0.0 : (r.total / maxTotal).clamp(0.0, 1.0);
+        final pct =
+            (maxTotal <= 0) ? 0.0 : (r.total / maxTotal).clamp(0.0, 1.0);
 
         return SizedBox(
           height: 22,
@@ -260,7 +266,8 @@ class _OrderList extends StatelessWidget {
                   Expanded(
                     child: Text(
                       _fmtPrice(r.price),
-                      style: (cellStyle ?? const TextStyle()).copyWith(color: priceColor),
+                      style: (cellStyle ?? const TextStyle())
+                          .copyWith(color: priceColor),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -296,7 +303,8 @@ class _TradesView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
-    final headerStyle = text.bodySmall?.copyWith(color: Colors.white70, fontSize: 11);
+    final headerStyle =
+        text.bodySmall?.copyWith(color: Colors.white70, fontSize: 11);
 
     return Column(
       children: [
@@ -310,7 +318,7 @@ class _TradesView extends StatelessWidget {
             ],
           ),
         ),
-        const Divider(height: 1, thickness: 1, color: Color(0x221FFFFFF)),
+        const Divider(height: 1, thickness: 1, color: Color(0x221ffffff)),
         Expanded(
           child: ListView.separated(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -318,13 +326,17 @@ class _TradesView extends StatelessWidget {
             separatorBuilder: (_, __) => const SizedBox(height: 6),
             itemBuilder: (context, index) {
               final t = trades[index];
-              final color = t.isBuy ? const Color(0xFF3DDB87) : const Color(0xFFFF5C5C);
+              final color =
+                  t.isBuy ? const Color(0xFF3DDB87) : const Color(0xFFFF5C5C);
               return Row(
                 children: [
                   Expanded(
                     child: Text(
                       _fmtPrice(t.price),
-                      style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                          color: color,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -338,7 +350,8 @@ class _TradesView extends StatelessWidget {
                   Expanded(
                     child: Text(
                       _fmtTime(t.time),
-                      style: const TextStyle(color: Colors.white70, fontSize: 12),
+                      style:
+                          const TextStyle(color: Colors.white70, fontSize: 12),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -394,6 +407,3 @@ class _TradeRow {
     required this.time,
   });
 }
-
-
-

@@ -10,11 +10,11 @@ class TradingPanel extends StatefulWidget {
 }
 
 class _TradingPanelState extends State<TradingPanel> {
-  String _selectedPair = 'BTC/USDT';
+  final String _selectedPair = 'BTC/USDT';
   bool _isBuy = true;
   final TextEditingController _priceController = TextEditingController(text: '86402.15');
   final TextEditingController _amountController = TextEditingController();
-  double _sliderValue = 0.0; // ignore: unused_field
+  final double _sliderValue = 0.0; // ignore: unused_field
   
   // 模拟盘口数据
   final Random _rng = Random();
