@@ -72,6 +72,22 @@ class WalletService extends ChangeNotifier {
           universal: 'https://riverbit.io',
         ),
       ),
+      // 使用 optionalNamespaces 来定义支持的链和方法
+      optionalNamespaces: {
+        'eip155': RequiredNamespace(
+          chains: ['eip155:1', 'eip155:56', 'eip155:137'], // ETH, BSC, Polygon
+          methods: [
+            'eth_sendTransaction',
+            'personal_sign',
+            'eth_signTypedData',
+          ],
+          events: ['chainChanged', 'accountsChanged'],
+        ),
+      },
+      featuredWalletIds: {
+        '971e689d0a5be527bac7963d4c458d9a0921431f928a0d0d500c1e6b911ef3661', // OKX Wallet
+        'f2436c67184f4d050659f0ade8361f2238491c6e1847f9f30325f69085805561', // Binance Web3 Wallet
+      },
     );
 
     await _appKitModal!.init();
