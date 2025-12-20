@@ -5,6 +5,13 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:walletconnect_flutter_v2/walletconnect_flutter_v2.dart';
 
 class WalletService extends ChangeNotifier {
+  // --- 核心修复：单例模式，应对 Android Activity 重启 ---
+  static final WalletService _instance = WalletService._internal();
+  factory WalletService() => _instance;
+  WalletService._internal() {
+    _initClient();
+  }
+
   static const String _projectId = '1d9024e332c1f6c37d6d4ca165b07104';
   static const String _relayUrl = 'wss://relay.walletconnect.com';
   
@@ -29,15 +36,11 @@ class WalletService extends ChangeNotifier {
   String? get networkName => _networkName;
   String? get connectionError => _connectionError;
 
-  WalletService() {
-    _initClient();
-  }
-
   void _addLog(String msg) {
     final time = DateTime.now().toString().split('.').first.split(' ').last;
     final log = '[$time] $msg';
     debugLogs.add(log);
-    if (debugLogs.length > 30) debugLogs.removeAt(0);
+    if (debugLogs.length > 50) debugLogs.removeAt(0);
     debugPrint('[WALLET_LOG] $log');
     notifyListeners();
   }
@@ -54,18 +57,19 @@ class WalletService extends ChangeNotifier {
           name: 'RiverBit',
           description: 'DEX',
           url: 'https://riverbit.com',
-          icons: [], // 留空防止崩溃
+          icons: [],
           redirect: Redirect(native: 'riverbit://'),
         ),
       );
 
       _wc!.onSessionConnect.subscribe((SessionConnect? args) {
-        _addLog('🎯 收到授权成功信号！');
+        _addLog('🎯 收到授权信号！');
         if (args != null) _handleSession(args.session);
       });
 
       _wc!.core.relayClient.onRelayClientConnect.subscribe((_) {
         _addLog('🌐 信令已连接');
+        _refreshActiveSession();
       });
 
       await _refreshActiveSession();
@@ -79,10 +83,14 @@ class WalletService extends ChangeNotifier {
 
   Future<void> _refreshActiveSession() async {
     if (_wc == null) return;
-    final sessions = _wc!.sessions.getAll();
-    if (sessions.isNotEmpty) {
-      _addLog('✅ 自动恢复会话');
-      _handleSession(sessions.first);
+    try {
+      final sessions = _wc!.sessions.getAll();
+      if (sessions.isNotEmpty) {
+        _addLog('✅ 恢复已存会话');
+        _handleSession(sessions.first);
+      }
+    } catch (e) {
+      _addLog('⚠️ 刷新会话异常: $e');
     }
   }
 
@@ -93,13 +101,15 @@ class WalletService extends ChangeNotifier {
     try {
       _isConnecting = true;
       _connectionError = null;
-      debugLogs.clear();
-      _addLog('🚀 发起【防崩溃】连接请求...');
+      _addLog('🚀 准备新连接...');
       notifyListeners();
 
-      // 清理旧 Pairing
-      for (var p in _wc!.pairings.getAll()) {
-        await _wc!.core.pairing.disconnect(topic: p.topic);
+      // 【核心优化】不要在连接瞬间暴力清理所有 Pairing，这会杀掉当前的请求
+      if (_wc!.pairings.getAll().length > 5) {
+        _addLog('🧹 清理积压配对...');
+        for (var p in _wc!.pairings.getAll().take(3)) {
+          await _wc!.core.pairing.disconnect(topic: p.topic);
+        }
       }
 
       if (!_wc!.core.relayClient.isConnected) {
@@ -107,40 +117,47 @@ class WalletService extends ChangeNotifier {
         await Future.delayed(const Duration(seconds: 1));
       }
 
-      // 【核心修复】使用极简配置，防止小狐狸 React Native 引擎崩溃
+      // 【核心修复】使用可选命名空间，增加兼容性，防止小狐狸拒绝
       final connectResp = await _wc!.connect(
         optionalNamespaces: {
           'eip155': RequiredNamespace(
-            chains: ['eip155:1'], // 仅请求主网
-            methods: ['personal_sign'], // 仅请求最基础的签名权限，规避崩溃
+            chains: ['eip155:1', 'eip155:56', 'eip155:137'], 
+            methods: ['eth_sendTransaction', 'personal_sign', 'eth_signTypedData_v4'],
             events: ['chainChanged', 'accountsChanged'],
           ),
         },
       );
 
       final uri = connectResp.uri;
-      if (uri == null) {
-        _addLog('❌ URI 生成失败');
-        _isConnecting = false;
-        return false;
-      }
+      if (uri == null) return false;
 
-      _addLog('📱 跳转小狐狸...');
-      final uriString = Uri.encodeComponent(uri.toString());
-      await launchUrl(
-        Uri.parse('metamask://wc?uri=$uriString'),
-        mode: LaunchMode.externalApplication,
-      );
+      _addLog('📱 唤起应用选择弹窗...');
+      // 【UI 层面恢复】直接使用 uri (wc: 协议)，这会弹出系统选择菜单
+      final success = await launchUrl(uri, mode: LaunchMode.externalApplication);
+
+      if (!success) {
+        _addLog('⚠️ 系统跳转失败，尝试直接唤起小狐狸...');
+        final encodedUri = Uri.encodeComponent(uri.toString());
+        await launchUrl(Uri.parse('metamask://wc?uri=$encodedUri'), mode: LaunchMode.externalApplication);
+      }
 
       _startPolling();
 
-      // 等待授权
-      final session = await connectResp.session.future.timeout(
-        const Duration(minutes: 3),
-        onTimeout: () => throw TimeoutException('等待授权超时'),
-      );
+      try {
+        final session = await connectResp.session.future.timeout(const Duration(minutes: 3));
+        _handleSession(session);
+      } catch (e) {
+        if (_session != null) {
+          _addLog('ℹ️ 授权已同步完成');
+        } else {
+          _addLog('⏰ 等待授权超时');
+          _isConnecting = false;
+          _stopPolling();
+          notifyListeners();
+          return false;
+        }
+      }
       
-      _handleSession(session);
       return true;
     } catch (e) {
       _addLog('❌ 连接异常: $e');
@@ -152,31 +169,42 @@ class WalletService extends ChangeNotifier {
   }
 
   void _handleSession(SessionData session) {
+    if (session.namespaces.isEmpty) return;
     _session = session;
     _addLog('📦 解析账户...');
     
-    final eip155 = session.namespaces['eip155'];
-    if (eip155 != null && eip155.accounts.isNotEmpty) {
-      final account = eip155.accounts.first;
-      final parts = account.split(':');
-      if (parts.length >= 3) {
-        _chainId = int.tryParse(parts[1]);
-        _address = parts[2];
-        _addLog('✅ 获取地址成功: ${_address?.substring(0, 10)}...');
+    String? foundAddress;
+    int? foundChainId;
+
+    // 🏆 深度扫描解析所有可能的命名空间 Key
+    for (var key in session.namespaces.keys) {
+      final ns = session.namespaces[key];
+      if (ns != null && ns.accounts.isNotEmpty) {
+        final account = ns.accounts.first;
+        final parts = account.split(':');
+        if (parts.length >= 3) {
+          foundChainId = int.tryParse(parts[1]);
+          foundAddress = parts[2];
+          _addLog('✅ 发现账户: ${foundAddress!.substring(0, 10)}...');
+          break;
+        }
       }
     }
 
-    _isConnecting = false;
-    _stopPolling();
-    _updateNetworkName();
-    _initializeWeb3Client();
-    _addLog('🎉 连接成功');
-    notifyListeners();
+    if (foundAddress != null) {
+      _address = foundAddress;
+      _chainId = foundChainId;
+      _isConnecting = false;
+      _stopPolling();
+      _updateNetworkName();
+      _initializeWeb3Client();
+      notifyListeners();
+    }
   }
 
   void _startPolling() {
     _stopPolling();
-    _pollingTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
+    _pollingTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
       if (isConnected) {
         timer.cancel();
         return;
@@ -208,13 +236,15 @@ class WalletService extends ChangeNotifier {
   }
 
   Future<void> checkConnectionStatus() async {
-    _addLog('🔄 应用切回前台，同步状态');
-    await _initClient();
-    if (_wc != null && !_wc!.core.relayClient.isConnected) {
-      await _wc!.core.relayClient.connect();
+    _addLog('🔄 切回前台，深度同步...');
+    await _initClient(); // 单例模式下这里只是获取引用
+    if (_wc != null) {
+      if (!_wc!.core.relayClient.isConnected) {
+        await _wc!.core.relayClient.connect();
+        await Future.delayed(const Duration(seconds: 2));
+      }
+      await _refreshActiveSession();
     }
-    await Future.delayed(const Duration(milliseconds: 1000));
-    await _refreshActiveSession();
   }
 
   Future<List<Map<String, String>>> getTokenBalances() async {
@@ -243,6 +273,7 @@ class WalletService extends ChangeNotifier {
     _address = null;
     _chainId = null;
     _isConnecting = false;
+    _stopPolling();
     notifyListeners();
   }
 
