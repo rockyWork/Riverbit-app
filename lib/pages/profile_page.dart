@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'dart:convert';
 import 'package:convert/convert.dart';
 import '../services/river_address_service.dart';
 
@@ -72,7 +74,7 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget _buildHeader() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 40),
+      padding: const EdgeInsets.symmetric(vertical: 24),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [Colors.orange.shade400, Colors.orange.shade700],
@@ -83,25 +85,37 @@ class _ProfilePageState extends State<ProfilePage> {
       child: Column(
         children: [
           Container(
-            padding: const EdgeInsets.all(4),
+            width: 80, // 设置底座固定宽度
+            height: 80, // 设置底座固定高度
             decoration: const BoxDecoration(
               color: Colors.white,
               shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black12,
+                  blurRadius: 8,
+                  offset: Offset(0, 2),
+                ),
+              ],
             ),
-            child: const CircleAvatar(
-              radius: 50,
-              backgroundColor: Colors.white,
-              // 使用小熊维尼风格的图片
-              backgroundImage: NetworkImage(
-                'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT6_6_6_6_6_6_6_6_6_6_6_6_6_6_6_6&s',
+            child: ClipOval(
+              child: Padding(
+                padding: const EdgeInsets.all(8.0), // 在圆形内留出一点边距，更美观
+                child: SvgPicture.asset(
+                  'lib/aseat/images/logo-Riverbit.svg',
+                  width: 64,
+                  height: 64,
+                  fit: BoxFit.contain, // 改为 contain，确保图标完整且不超出
+                  placeholderBuilder: (context) => const Icon(Icons.person, size: 40, color: Colors.orange),
+                ),
               ),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           const Text(
             'RiverBit User',
             style: TextStyle(
-              fontSize: 24,
+              fontSize: 20,
               fontWeight: FontWeight.bold,
               color: Colors.white,
             ),
@@ -109,7 +123,7 @@ class _ProfilePageState extends State<ProfilePage> {
           const Text(
             'RiverChain Wallet',
             style: TextStyle(
-              fontSize: 14,
+              fontSize: 12,
               color: Colors.white70,
             ),
           ),

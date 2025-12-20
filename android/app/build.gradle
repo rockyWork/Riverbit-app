@@ -37,6 +37,13 @@ android {
             signingConfig = signingConfigs.debug
         }
     }
+
+    // 强制更改生成的 APK 文件名
+    applicationVariants.all { variant ->
+        variant.outputs.all {
+            outputFileName = "Riverbit-${variant.name}.apk"
+        }
+    }
 }
 
 flutter {
