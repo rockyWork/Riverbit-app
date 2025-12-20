@@ -69,11 +69,14 @@ class WalletService extends ChangeNotifier with WidgetsBindingObserver {
         projectId: _projectId,
         relayUrl: _relayUrl,
         metadata: const PairingMetadata(
-          name: 'RiverBit DEX',
+          name: 'RiverBit',
           description: 'RiverBit Decentralized Exchange',
-          url: 'https://riverbit.io',
+          url: 'riverbit://app', // 改为协议头，防止钱包在内部打开网页
           icons: ['https://riverbit.io/logo.png'],
-          redirect: Redirect(native: 'riverbit://'),
+          redirect: Redirect(
+            native: 'riverbit://app', // 增加 host
+            universal: 'https://riverbit.io',
+          ),
         ),
       );
 
