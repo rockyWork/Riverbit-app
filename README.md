@@ -20,3 +20,9 @@ flutter build apk --release  打安卓的app  包
 adb devices  查看真机调试设备号
 
 flutter run -d AESQVB4521003199 真机跑起来
+
+flutter clean
+
+flutter build apk
+
+stop-process -name java -Force 杀死java  JDK 进程

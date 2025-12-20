@@ -43,7 +43,12 @@ class _MainNavigationPageState extends State<MainNavigationPage> with WidgetsBin
     WidgetsBinding.instance.addObserver(this);
     _walletService = WalletService();
     _walletService.addListener(_onWalletStateChanged);
-    // 初始化页面列表，避免每次重建时创建新实例
+    
+    // 延迟初始化以确保 BuildContext 可用
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _walletService.init(context);
+    });
+
     _pages = [
       HomePage(
         walletService: _walletService,
@@ -62,18 +67,11 @@ class _MainNavigationPageState extends State<MainNavigationPage> with WidgetsBin
     super.dispose();
   }
 
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    super.didChangeAppLifecycleState(state);
-    // 当应用从后台回到前台时，检查连接状态
-    if (state == AppLifecycleState.resumed) {
-      debugPrint('App resumed, checking wallet connection status...');
-      _walletService.checkConnectionStatus();
-    }
-  }
 
   void _onWalletStateChanged() {
-    setState(() {});
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   final List<String> _titles = const [
@@ -87,79 +85,7 @@ class _MainNavigationPageState extends State<MainNavigationPage> with WidgetsBin
     if (_walletService.isConnected) {
       await _walletService.disconnect();
     } else {
-      // 弹出钱包选择器
-      if (!mounted) return;
-      showModalBottomSheet(
-        context: context,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        builder: (context) => Container(
-          padding: const EdgeInsets.symmetric(vertical: 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                '选择钱包连接',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 20),
-              ListTile(
-                leading: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: Colors.black,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Center(
-                    child: Text(
-                      'OKX',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-                title: const Text('OKX Wallet'),
-                subtitle: const Text('推荐使用 OKX 钱包'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _walletService.connect(walletScheme: 'okx');
-                },
-              ),
-              ListTile(
-                leading: Image.network(
-                  'https://upload.wikimedia.org/wikipedia/commons/thumb/3/36/MetaMask_Alpha_Color.svg/512px-MetaMask_Alpha_Color.svg.png',
-                  width: 40,
-                  height: 40,
-                  errorBuilder: (context, error, stackTrace) => const Icon(Icons.wallet, size: 40),
-                ),
-                title: const Text('MetaMask'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _walletService.connect(walletScheme: 'metamask');
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.apps, size: 40, color: Colors.blue),
-                title: const Text('其他钱包'),
-                subtitle: const Text('使用系统默认选择器'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _walletService.connect();
-                },
-              ),
-              const SizedBox(height: 20),
-            ],
-          ),
-        ),
-      );
+      await _walletService.connect(context);
     }
   }
 

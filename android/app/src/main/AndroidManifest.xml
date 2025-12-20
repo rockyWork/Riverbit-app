@@ -9,7 +9,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:launchMode="singleInstance"
+            android:launchMode="singleTask"
             android:taskAffinity=""
             android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
@@ -53,10 +53,17 @@
         </intent>
         <!-- 支持打开 MetaMask 应用 -->
         <package android:name="io.metamask" />
+        <!-- 支持打开 OKX 应用 -->
+        <package android:name="com.okinc.okex.gp" />
         <!-- MetaMask 深度链接协议 -->
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="metamask" />
+        </intent>
+        <!-- OKX 深度链接协议 -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="okx" />
         </intent>
         <!-- WalletConnect 协议 -->
         <intent>

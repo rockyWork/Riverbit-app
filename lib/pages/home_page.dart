@@ -150,7 +150,7 @@ class _HomePageState extends State<HomePage> {
 
           const SizedBox(height: 4),
           // 钱包信息（仅在连接时显示）
-          if (walletService.isConnected)
+          if (walletService.isConnected) ...[
             VaultContentWidget(
               networkName: walletService.networkName ?? 'Unknown',
               chainId: walletService.chainId?.toString() ?? '0',
@@ -158,7 +158,48 @@ class _HomePageState extends State<HomePage> {
                   ? [{'symbol': 'Loading...', 'balance': '...'}]
                   : _tokenBalances,
               address: walletService.address,
-            )
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+                        final sig = await walletService.personalSign('Hello RiverBit! ${DateTime.now()}');
+                        if (sig != null && mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('签名成功: ${sig.substring(0, 20)}...')),
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.edit),
+                      label: const Text('测试签名'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+                        // 示例：向自己发送 0 ETH 测试交易
+                        final tx = await walletService.sendTransaction(
+                          to: walletService.address!,
+                          valueInWei: '0',
+                        );
+                        if (tx != null && mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('交易已发送: ${tx.substring(0, 20)}...')),
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.send),
+                      label: const Text('测试交易'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ]
           else if (walletService.isConnecting)
             Padding(
               padding: const EdgeInsets.all(16.0),
@@ -235,8 +276,8 @@ class _HomePageState extends State<HomePage> {
                     ],
                     const SizedBox(height: 24),
                     ElevatedButton(
-                      onPressed: () => walletService.checkConnectionStatus(),
-                      child: const Text('手动刷新状态'),
+                      onPressed: () => walletService.init(context),
+                      child: const Text('重试初始化'),
                     ),
                   ],
                 ),
