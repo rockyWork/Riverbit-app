@@ -33,6 +33,30 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "2.0.1"
+  bech32:
+    dependency: "direct main"
+    description:
+      name: bech32
+      sha256: "156cbace936f7720c79a79d16a03efad343b1ef17106716e04b8b8e39f99f7f7"
+      url: "https://pub.flutter-io.cn"
+    source: hosted
+    version: "0.2.2"
+  bip32:
+    dependency: "direct main"
+    description:
+      name: bip32
+      sha256: "54787cd7a111e9d37394aabbf53d1fc5e2e0e0af2cd01c459147a97c0e3f8a97"
+      url: "https://pub.flutter-io.cn"
+    source: hosted
+    version: "2.0.0"
+  bip39:
+    dependency: "direct main"
+    description:
+      name: bip39
+      sha256: de1ee27ebe7d96b84bb3a04a4132a0a3007dcdd5ad27dd14aa87a29d97c45edc
+      url: "https://pub.flutter-io.cn"
+    source: hosted
+    version: "1.0.6"
   boolean_selector:
     dependency: transitive
     description:
@@ -46,6 +70,14 @@ packages:
     description:
       name: bs58
       sha256: "3ed24dadf386ca749ff50af678be1131ef569a3583a6f37b87b90c032270c767"
+      url: "https://pub.flutter-io.cn"
+    source: hosted
+    version: "1.0.2"
+  bs58check:
+    dependency: transitive
+    description:
+      name: bs58check
+      sha256: c4a164d42b25c2f6bc88a8beccb9fc7d01440f3c60ba23663a20a70faf484ea9
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "1.0.2"
@@ -90,7 +122,7 @@ packages:
     source: hosted
     version: "2.0.1"
   convert:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: convert
       sha256: b30acd5944035672bc15c6b7a8b47d773e41e2f17de064350988c5d02adb1c68
@@ -224,6 +256,14 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "2.4.4"
+  hex:
+    dependency: transitive
+    description:
+      name: hex
+      sha256: "4e7cd54e4b59ba026432a6be2dd9d96e4c5205725194997193bf871703b82c4a"
+      url: "https://pub.flutter-io.cn"
+    source: hosted
+    version: "0.2.0"
   http:
     dependency: "direct main"
     description:
