@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import '../components/carousel.dart';
 import '../components/vault/vault_content.dart';
@@ -28,6 +29,7 @@ class _HomePageState extends State<HomePage> {
   List<Map<String, String>> _tokenBalances = [];
   bool _isLoadingBalances = false;
   bool _isSigning = false;
+  bool _isSendingTx = false; // 💡 增加交易发送状态
   String? _lastAddress; // 💡 记录上次成功抓取余额的地址
   Timer? _connectionTimer; // 💡 用于连接超时的定时器
   bool _showManualConnect = false; // 💡 是否显示手动连接提示
@@ -323,20 +325,91 @@ class _HomePageState extends State<HomePage> {
                   children: [
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: () async {
-                          // 示例：向自己发送 0 ETH 测试交易
-                          final tx = await walletService.sendTransaction(
-                            to: walletService.address!,
-                            valueInWei: '0',
+                        onPressed: _isSendingTx ? null : () async {
+                          final TextEditingController addressController = TextEditingController(
+                            text: '0xaae6a4a986e6f7930b9f54005a7e986eafd57ac4'
                           );
-                          if (tx != null && mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('交易已发送: ${tx.substring(0, 20)}...')),
-                            );
+                          final TextEditingController amountController = TextEditingController(text: '0');
+
+                          final result = await showDialog<bool>(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: const Text('发起测试交易'),
+                              content: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  TextField(
+                                    controller: addressController,
+                                    decoration: const InputDecoration(
+                                      labelText: '接收地址',
+                                      hintText: '请输入 0x 开头的地址',
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  TextField(
+                                    controller: amountController,
+                                    decoration: const InputDecoration(
+                                      labelText: '金额 (Wei)',
+                                      hintText: '1 ETH = 10^18 Wei',
+                                    ),
+                                    keyboardType: TextInputType.number,
+                                  ),
+                                ],
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context, false),
+                                  child: const Text('取消'),
+                                ),
+                                ElevatedButton(
+                                  onPressed: () => Navigator.pop(context, true),
+                                  child: const Text('发送'),
+                                ),
+                              ],
+                            ),
+                          );
+
+                          if (result == true) {
+                            setState(() => _isSendingTx = true);
+                            try {
+                              final tx = await walletService.sendTransaction(
+                                to: addressController.text.trim(),
+                                valueInWei: amountController.text.trim(),
+                              );
+                              
+                              await Future.delayed(const Duration(milliseconds: 300));
+                              
+                              if (tx != null && mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('交易已发送: ${tx.substring(0, min(tx.length, 20))}...'),
+                                    action: SnackBarAction(
+                                      label: '查看详情',
+                                      onPressed: () {
+                                        // TODO: 可以添加跳转到区块链浏览器的逻辑
+                                      },
+                                    ),
+                                  ),
+                                );
+                              } else if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('交易未完成或已被拒绝。'),
+                                    backgroundColor: Colors.orange,
+                                  ),
+                                );
+                              }
+                            } finally {
+                              if (mounted) {
+                                setState(() => _isSendingTx = false);
+                              }
+                            }
                           }
                         },
-                        icon: const Icon(Icons.send),
-                        label: const Text('测试交易'),
+                        icon: _isSendingTx 
+                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Icon(Icons.send),
+                        label: Text(_isSendingTx ? '正在跳转...' : '测试交易'),
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           shape: RoundedRectangleBorder(

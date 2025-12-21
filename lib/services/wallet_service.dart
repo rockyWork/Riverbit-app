@@ -278,11 +278,24 @@ class WalletService extends ChangeNotifier {
     required String valueInWei,
   }) async {
     final addr = address;
-    if (!isConnected || _appKitModal == null || addr == null) return null;
+    if (!isConnected || _appKitModal == null || addr == null) {
+      _addLog('❌ 无法发送交易: 钱包未连接');
+      return null;
+    }
+    
     try {
-      _addLog('💸 发起转账请求...');
+      _addLog('💸 准备发起交易请求...');
+      _addLog('📤 To: $to, Value: $valueInWei Wei');
+      
+      final session = _appKitModal!.session;
+      if (session == null || session.topic == null) {
+        _addLog('❌ 无法发送交易: 会话无效');
+        return null;
+      }
+
+      // 1. 发起请求
       final requestFuture = _appKitModal!.request(
-        topic: _appKitModal!.session!.topic!,
+        topic: session.topic!,
         chainId: _appKitModal!.selectedChain!.chainId,
         request: SessionRequestParams(
           method: 'eth_sendTransaction',
@@ -291,19 +304,26 @@ class WalletService extends ChangeNotifier {
               'from': addr,
               'to': to,
               'value': '0x${BigInt.parse(valueInWei).toRadixString(16)}',
+              'data': '0x', // 显式添加 data
             },
           ],
         ),
       );
 
-      // 触发跳转
+      // 2. 立即触发跳转
       await _triggerWalletJump();
 
+      // 3. 等待结果
+      _addLog('⏳ 等待钱包响应 (请在钱包中完成操作)...');
       final result = await requestFuture;
-      _addLog('✅ 交易已发送: $result');
+      
+      _addLog('✅ 交易已发送，哈希: $result');
       return result.toString();
     } catch (e) {
-      _addLog('❌ 交易失败: $e');
+      _addLog('❌ 交易执行失败: $e');
+      if (e.toString().contains('CanNotLaunchUrl')) {
+        _addLog('💡 提示: 无法自动唤起钱包，请手动切换到钱包进行确认。');
+      }
       return null;
     }
   }
