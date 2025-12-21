@@ -49,6 +49,7 @@ class WalletService extends ChangeNotifier {
   ReownAppKitModal? get appKitModal => _appKitModal;
 
   bool _isDisposed = false;
+  bool _hasClosedModalForCurrentSession = false; // 💡 逻辑锁：防止关闭指令死循环
 
   void _addLog(String msg) {
     if (_isDisposed) {
@@ -111,11 +112,27 @@ class WalletService extends ChangeNotifier {
   }
 
   void _onModalStateChanged() {
-    _addLog('🔄 模态框状态变更: isConnected=$isConnected');
-    // 💡 修正方法名：从 closeModalView 改为 closeModal
-    if (isConnected && (_appKitModal?.isOpen ?? false)) {
-      _addLog('✅ 检测到连接成功，正在自动关闭等待模态框...');
-      _appKitModal?.closeModal();
+    _addLog('🔄 模态框状态变更: isConnected=$isConnected, isOpen=${_appKitModal?.isOpen}');
+    
+    // 💡 强力修复：只要检测到连接成功，且本次连接尚未清理过 UI，就执行清理
+    if (isConnected) {
+      if (!_hasClosedModalForCurrentSession) {
+        _hasClosedModalForCurrentSession = true; // 立即加锁
+        _addLog('✅ 检测到连接成功，执行强力清理序列...');
+        
+        // 连续发送关闭指令，确保残余的转圈 Overlay 被彻底移除
+        // 不判断 isOpen，因为 Android 系统回跳时该变量同步极慢
+        for (int i = 0; i < 3; i++) {
+          Future.delayed(Duration(milliseconds: 300 * i), () {
+            try {
+              _appKitModal?.closeModal();
+            } catch (_) {}
+          });
+        }
+      }
+    } else {
+      // 只有断开连接时才重置锁
+      _hasClosedModalForCurrentSession = false;
     }
     notifyListeners();
   }

@@ -27,11 +27,13 @@ class _HomePageState extends State<HomePage> {
   List<Map<String, String>> _tokenBalances = [];
   bool _isLoadingBalances = false;
   bool _isSigning = false;
+  String? _lastAddress; // 💡 记录上次成功抓取余额的地址
 
   @override
   void initState() {
     super.initState();
-    widget.walletService.addListener(_loadBalances);
+    // 💡 改为监听统一的处理函数，而不是直接调用加载函数
+    widget.walletService.addListener(_handleWalletNotification);
     if (widget.walletService.isConnected) {
       _loadBalances();
     }
@@ -39,22 +41,34 @@ class _HomePageState extends State<HomePage> {
 
   @override
   void dispose() {
-    widget.walletService.removeListener(_loadBalances);
+    widget.walletService.removeListener(_handleWalletNotification);
     super.dispose();
   }
 
+  // 💡 只有当地址真正变化，或者从断开变为连接时才执行余额刷新
+  void _handleWalletNotification() {
+    final currentAddress = widget.walletService.address;
+    if (currentAddress != _lastAddress && widget.walletService.isConnected) {
+      debugPrint('Detected address change: $_lastAddress -> $currentAddress');
+      _loadBalances();
+    }
+  }
+
   void _loadBalances() {
-    debugPrint('=== _loadBalances called ===');
-    debugPrint('isConnected: ${widget.walletService.isConnected}');
-    debugPrint('address: ${widget.walletService.address}');
+    // 如果正在加载，则直接跳过，防止并发导致的死循环
+    if (_isLoadingBalances) return;
+
+    final currentAddress = widget.walletService.address;
+    _lastAddress = currentAddress; 
     
-    if (widget.walletService.isConnected) {
-      debugPrint('Wallet is connected, loading balances...');
+    debugPrint('=== _loadBalances called ===');
+    
+    if (widget.walletService.isConnected && currentAddress != null) {
       setState(() {
         _isLoadingBalances = true;
       });
+      
       widget.walletService.getTokenBalances().then((balances) {
-        debugPrint('Token balances received: $balances');
         if (mounted) {
           setState(() {
             _tokenBalances = balances.map((b) => {
@@ -63,11 +77,8 @@ class _HomePageState extends State<HomePage> {
             }).toList();
             _isLoadingBalances = false;
           });
-          debugPrint('Token balances updated in UI: $_tokenBalances');
         }
       }).catchError((error) {
-        debugPrint('Error loading balances: $error');
-        debugPrint('Stack trace: ${StackTrace.current}');
         if (mounted) {
           setState(() {
             _isLoadingBalances = false;
@@ -75,11 +86,12 @@ class _HomePageState extends State<HomePage> {
         }
       });
     } else {
-      debugPrint('Wallet is not connected, clearing balances');
-      setState(() {
-        _tokenBalances = [];
-        _isLoadingBalances = false;
-      });
+      if (mounted) {
+        setState(() {
+          _tokenBalances = [];
+          _isLoadingBalances = false;
+        });
+      }
     }
   }
 
