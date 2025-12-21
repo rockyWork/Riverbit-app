@@ -160,22 +160,50 @@ class WalletService extends ChangeNotifier {
   // 辅助方法：强制唤起钱包
   Future<void> _triggerWalletJump() async {
     try {
-      _addLog('📲 正在尝试手动唤起钱包...');
-      
+      _addLog('📲 正在尝试唤起钱包...');
+
       // 1. 尝试使用 SDK 推荐方式
-      _appKitModal?.launchConnectedWallet();
-      
-      // 2. 检查是否有 Peer Metadata 中的原生协议
-      final redirect = _appKitModal?.session?.peer?.metadata.redirect;
-      if (redirect?.native != null) {
-        final uri = Uri.parse(redirect!.native!);
-        _addLog('🔗 尝试使用原生协议跳转: $uri');
+      try {
+        _appKitModal?.launchConnectedWallet();
+      } catch (e) {
+        _addLog('⚠️ launchConnectedWallet 失败: $e');
+      }
+
+      // 2. 检查会话元数据，尝试手动跳转
+      final session = _appKitModal?.session;
+      final peerMetadata = session?.peer?.metadata;
+      final nativeRedirect = peerMetadata?.redirect?.native;
+
+      if (nativeRedirect != null && nativeRedirect.isNotEmpty) {
+        _addLog('🔗 发现原生跳转协议: $nativeRedirect');
+        final uri = Uri.parse(nativeRedirect);
         if (await canLaunchUrl(uri)) {
           await launchUrl(uri, mode: LaunchMode.externalApplication);
+          return;
         }
       }
+
+      // 3. 针对已知钱包的兜底方案 (如 OKX)
+      final peerName = peerMetadata?.name.toLowerCase() ?? '';
+      if (peerName.contains('okx')) {
+        _addLog('🎯 检测到 OKX 钱包，尝试直接唤起 okx://');
+        final okxUri = Uri.parse('okx://');
+        if (await canLaunchUrl(okxUri)) {
+          await launchUrl(okxUri, mode: LaunchMode.externalApplication);
+          return;
+        }
+      } else if (peerName.contains('metamask')) {
+        _addLog('🎯 检测到 MetaMask 钱包，尝试直接唤起 metamask://');
+        final mmUri = Uri.parse('metamask://');
+        if (await canLaunchUrl(mmUri)) {
+          await launchUrl(mmUri, mode: LaunchMode.externalApplication);
+          return;
+        }
+      }
+
+      _addLog('💡 未能找到自动唤起方式，请手动切换钱包');
     } catch (e) {
-      _addLog('⚠️ 唤起钱包尝试结束: $e');
+      _addLog('❌ 唤起钱包过程出错: $e');
     }
   }
 
