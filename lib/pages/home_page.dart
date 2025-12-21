@@ -26,6 +26,7 @@ class _HomePageState extends State<HomePage> {
 
   List<Map<String, String>> _tokenBalances = [];
   bool _isLoadingBalances = false;
+  bool _isSigning = false;
 
   @override
   void initState() {
@@ -161,40 +162,129 @@ class _HomePageState extends State<HomePage> {
             ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
+              child: Column(
                 children: [
-                  Expanded(
+                  SizedBox(
+                    width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: () async {
-                        final sig = await walletService.personalSign('Hello RiverBit! ${DateTime.now()}');
-                        if (sig != null && mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('签名成功: ${sig.substring(0, 20)}...')),
-                          );
+                      onPressed: _isSigning ? null : () async {
+                        setState(() => _isSigning = true);
+                        try {
+                          final msg = 'RiverBit Login - ${DateTime.now().millisecondsSinceEpoch}';
+                          final sig = await walletService.personalSign(msg);
+                          if (sig != null && mounted) {
+                            showDialog(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                title: const Row(
+                                  children: [
+                                    Icon(Icons.check_circle, color: Colors.green),
+                                    SizedBox(width: 8),
+                                    Text('签名成功'),
+                                  ],
+                                ),
+                                content: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text('消息内容:', style: TextStyle(fontWeight: FontWeight.bold)),
+                                    Text(msg),
+                                    const SizedBox(height: 12),
+                                    const Text('签名哈希:', style: TextStyle(fontWeight: FontWeight.bold)),
+                                    SelectableText(
+                                      sig,
+                                      style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+                                    ),
+                                  ],
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(context),
+                                    child: const Text('确定'),
+                                  ),
+                                ],
+                              ),
+                            );
+                          } else if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('签名失败或已取消，请检查钱包。'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        } finally {
+                          if (mounted) {
+                            setState(() => _isSigning = false);
+                          }
                         }
                       },
-                      icon: const Icon(Icons.edit),
-                      label: const Text('测试签名'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue.shade600,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 2,
+                      ),
+                      icon: _isSigning 
+                        ? const SizedBox(
+                            width: 20, 
+                            height: 20, 
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)
+                          )
+                        : const Icon(Icons.security),
+                      label: Text(
+                        _isSigning ? '正在唤起钱包...' : '测试钱包签名',
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () async {
-                        // 示例：向自己发送 0 ETH 测试交易
-                        final tx = await walletService.sendTransaction(
-                          to: walletService.address!,
-                          valueInWei: '0',
-                        );
-                        if (tx != null && mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('交易已发送: ${tx.substring(0, 20)}...')),
-                          );
-                        }
-                      },
-                      icon: const Icon(Icons.send),
-                      label: const Text('测试交易'),
-                    ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            // 示例：向自己发送 0 ETH 测试交易
+                            final tx = await walletService.sendTransaction(
+                              to: walletService.address!,
+                              valueInWei: '0',
+                            );
+                            if (tx != null && mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('交易已发送: ${tx.substring(0, 20)}...')),
+                              );
+                            }
+                          },
+                          icon: const Icon(Icons.send),
+                          label: const Text('测试交易'),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => walletService.disconnect(),
+                          icon: const Icon(Icons.logout),
+                          label: const Text('断开连接'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.red.shade700,
+                            side: BorderSide(color: Colors.red.shade200),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

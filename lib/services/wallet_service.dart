@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:reown_appkit/reown_appkit.dart';
 import 'package:web3dart/web3dart.dart';
+import 'package:convert/convert.dart';
 
 class WalletService extends ChangeNotifier {
   static final WalletService _instance = WalletService._internal();
@@ -45,13 +47,23 @@ class WalletService extends ChangeNotifier {
 
   ReownAppKitModal? get appKitModal => _appKitModal;
 
+  bool _isDisposed = false;
+
   void _addLog(String msg) {
+    if (_isDisposed) {
+      debugPrint('[WALLET_LOG_DISPOSED] $msg');
+      return;
+    }
     final time = DateTime.now().toString().split('.').first.split(' ').last;
     final log = '[$time] $msg';
     debugLogs.add(log);
     if (debugLogs.length > 50) debugLogs.removeAt(0);
     debugPrint('[WALLET_LOG] $log');
-    notifyListeners();
+    try {
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error notifying listeners: $e');
+    }
   }
 
   Future<void> init(BuildContext context) async {
@@ -141,16 +153,32 @@ class WalletService extends ChangeNotifier {
   // 签名消息
   Future<String?> personalSign(String message) async {
     final addr = address;
-    if (!isConnected || _appKitModal == null || addr == null) return null;
+    if (!isConnected || _appKitModal == null || addr == null) {
+      _addLog('❌ 无法签名: 钱包未连接');
+      return null;
+    }
+    
+    final session = _appKitModal!.session;
+    if (session == null || session.topic == null) {
+      _addLog('❌ 无法签名: 会话无效');
+      return null;
+    }
+
     try {
       _addLog('✍️ 发起签名请求...');
+      
+      // 多数钱包期望 personal_sign 的消息是十六进制格式
+      final hexMsg = '0x${hex.encode(utf8.encode(message))}';
+      _addLog('📝 签名内容: $message ($hexMsg)');
+      _addLog('🌐 当前链 ID: ${_appKitModal!.selectedChain?.chainId}');
+
       final result = await _appKitModal!.request(
-        topic: _appKitModal!.session!.topic,
+        topic: session.topic!,
         chainId: _appKitModal!.selectedChain!.chainId,
         request: SessionRequestParams(
           method: 'personal_sign',
           params: [
-            message,
+            hexMsg,
             addr,
           ],
         ),
@@ -158,7 +186,10 @@ class WalletService extends ChangeNotifier {
       _addLog('✅ 签名成功');
       return result.toString();
     } catch (e) {
-      _addLog('❌ 签名失败: $e');
+      _addLog('❌ 签名失败 (详细信息): $e');
+      if (e.toString().contains('CanNotLaunchUrl')) {
+        _addLog('💡 提示: 无法唤起钱包应用，请确保 OKX 或 MetaMask 已安装并在后台运行');
+      }
       return null;
     }
   }
@@ -196,6 +227,7 @@ class WalletService extends ChangeNotifier {
 
   @override
   void dispose() {
+    _isDisposed = true;
     _appKitModal?.removeListener(_onModalStateChanged);
     super.dispose();
   }

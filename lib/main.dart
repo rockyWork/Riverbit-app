@@ -63,7 +63,6 @@ class _MainNavigationPageState extends State<MainNavigationPage> with WidgetsBin
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _walletService.removeListener(_onWalletStateChanged);
-    _walletService.dispose();
     super.dispose();
   }
 
