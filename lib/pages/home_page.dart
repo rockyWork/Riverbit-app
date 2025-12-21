@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../components/carousel.dart';
 import '../components/vault/vault_content.dart';
@@ -28,6 +29,8 @@ class _HomePageState extends State<HomePage> {
   bool _isLoadingBalances = false;
   bool _isSigning = false;
   String? _lastAddress; // 💡 记录上次成功抓取余额的地址
+  Timer? _connectionTimer; // 💡 用于连接超时的定时器
+  bool _showManualConnect = false; // 💡 是否显示手动连接提示
 
   @override
   void initState() {

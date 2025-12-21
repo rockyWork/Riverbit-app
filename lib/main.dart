@@ -93,7 +93,7 @@ class _MainNavigationPageState extends State<MainNavigationPage> with WidgetsBin
     return Scaffold(
       appBar: AppBar(
         title: Text(_titles[_currentIndex]),
-        actions: _currentIndex == 0
+        actions: _currentIndex == 0 && !_walletService.isConnected
             ? [
                 Container(
                   margin: const EdgeInsets.only(right: 8),
@@ -116,9 +116,9 @@ class _MainNavigationPageState extends State<MainNavigationPage> with WidgetsBin
                               valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                             ),
                           )
-                        : Text(
-                            _walletService.isConnected ? '断开连接' : '连接钱包',
-                            style: const TextStyle(
+                        : const Text(
+                            '连接钱包',
+                            style: TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
                             ),
