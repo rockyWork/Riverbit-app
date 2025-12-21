@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:reown_appkit/reown_appkit.dart';
 import 'package:web3dart/web3dart.dart';
 import 'package:convert/convert.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class WalletService extends ChangeNotifier {
   static final WalletService _instance = WalletService._internal();
@@ -110,6 +111,12 @@ class WalletService extends ChangeNotifier {
   }
 
   void _onModalStateChanged() {
+    _addLog('🔄 模态框状态变更: isConnected=$isConnected');
+    // 💡 修正方法名：从 closeModalView 改为 closeModal
+    if (isConnected && (_appKitModal?.isOpen ?? false)) {
+      _addLog('✅ 检测到连接成功，正在自动关闭等待模态框...');
+      _appKitModal?.closeModal();
+    }
     notifyListeners();
   }
 
@@ -150,6 +157,28 @@ class WalletService extends ChangeNotifier {
     }
   }
 
+  // 辅助方法：强制唤起钱包
+  Future<void> _triggerWalletJump() async {
+    try {
+      _addLog('📲 正在尝试手动唤起钱包...');
+      
+      // 1. 尝试使用 SDK 推荐方式
+      _appKitModal?.launchConnectedWallet();
+      
+      // 2. 检查是否有 Peer Metadata 中的原生协议
+      final redirect = _appKitModal?.session?.peer?.metadata.redirect;
+      if (redirect?.native != null) {
+        final uri = Uri.parse(redirect!.native!);
+        _addLog('🔗 尝试使用原生协议跳转: $uri');
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        }
+      }
+    } catch (e) {
+      _addLog('⚠️ 唤起钱包尝试结束: $e');
+    }
+  }
+
   // 签名消息
   Future<String?> personalSign(String message) async {
     final addr = address;
@@ -166,29 +195,33 @@ class WalletService extends ChangeNotifier {
 
     try {
       _addLog('✍️ 发起签名请求...');
-      
-      // 多数钱包期望 personal_sign 的消息是十六进制格式
       final hexMsg = '0x${hex.encode(utf8.encode(message))}';
       _addLog('📝 签名内容: $message ($hexMsg)');
-      _addLog('🌐 当前链 ID: ${_appKitModal!.selectedChain?.chainId}');
 
-      final result = await _appKitModal!.request(
+      // 1. 发起请求（注意：这里不立即 await，为了能紧接着触发跳转）
+      final requestFuture = _appKitModal!.request(
         topic: session.topic!,
         chainId: _appKitModal!.selectedChain!.chainId,
         request: SessionRequestParams(
           method: 'personal_sign',
-          params: [
-            hexMsg,
-            addr,
-          ],
+          params: [hexMsg, addr],
         ),
       );
+
+      // 2. 立即触发跳转逻辑（包裹在 try-catch 中防止崩溃）
+      await _triggerWalletJump();
+
+      // 3. 等待签名结果
+      _addLog('⏳ 等待钱包响应 (请在钱包中完成操作)...');
+      final result = await requestFuture;
+      
       _addLog('✅ 签名成功');
       return result.toString();
     } catch (e) {
       _addLog('❌ 签名失败 (详细信息): $e');
+      // 如果报错包含 CanNotLaunchUrl，说明自动跳转失败了，但不代表请求没发出去
       if (e.toString().contains('CanNotLaunchUrl')) {
-        _addLog('💡 提示: 无法唤起钱包应用，请确保 OKX 或 MetaMask 已安装并在后台运行');
+        _addLog('💡 提示: 无法自动唤起钱包，请手动切换到钱包进行确认。');
       }
       return null;
     }
@@ -203,8 +236,8 @@ class WalletService extends ChangeNotifier {
     if (!isConnected || _appKitModal == null || addr == null) return null;
     try {
       _addLog('💸 发起转账请求...');
-      final result = await _appKitModal!.request(
-        topic: _appKitModal!.session!.topic,
+      final requestFuture = _appKitModal!.request(
+        topic: _appKitModal!.session!.topic!,
         chainId: _appKitModal!.selectedChain!.chainId,
         request: SessionRequestParams(
           method: 'eth_sendTransaction',
@@ -217,6 +250,11 @@ class WalletService extends ChangeNotifier {
           ],
         ),
       );
+
+      // 触发跳转
+      await _triggerWalletJump();
+
+      final result = await requestFuture;
       _addLog('✅ 交易已发送: $result');
       return result.toString();
     } catch (e) {

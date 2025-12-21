@@ -172,46 +172,54 @@ class _HomePageState extends State<HomePage> {
                         try {
                           final msg = 'RiverBit Login - ${DateTime.now().millisecondsSinceEpoch}';
                           final sig = await walletService.personalSign(msg);
-                          if (sig != null && mounted) {
-                            showDialog(
-                              context: context,
-                              builder: (context) => AlertDialog(
-                                title: const Row(
-                                  children: [
-                                    Icon(Icons.check_circle, color: Colors.green),
-                                    SizedBox(width: 8),
-                                    Text('签名成功'),
-                                  ],
-                                ),
-                                content: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text('消息内容:', style: TextStyle(fontWeight: FontWeight.bold)),
-                                    Text(msg),
-                                    const SizedBox(height: 12),
-                                    const Text('签名哈希:', style: TextStyle(fontWeight: FontWeight.bold)),
-                                    SelectableText(
-                                      sig,
-                                      style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+                          
+                          // 💡 增加微小延迟，确保从钱包切回 App 后的 UI 状态已稳定
+                          await Future.delayed(const Duration(milliseconds: 300));
+                          
+                          if (sig != null) {
+                            if (mounted) {
+                              showDialog(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: const Row(
+                                    children: [
+                                      Icon(Icons.check_circle, color: Colors.green),
+                                      SizedBox(width: 8),
+                                      Text('签名成功'),
+                                    ],
+                                  ),
+                                  content: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text('消息内容:', style: TextStyle(fontWeight: FontWeight.bold)),
+                                      Text(msg),
+                                      const SizedBox(height: 12),
+                                      const Text('签名哈希:', style: TextStyle(fontWeight: FontWeight.bold)),
+                                      SelectableText(
+                                        sig,
+                                        style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+                                      ),
+                                    ],
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(context),
+                                      child: const Text('确定'),
                                     ),
                                   ],
                                 ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => Navigator.pop(context),
-                                    child: const Text('确定'),
-                                  ),
-                                ],
-                              ),
-                            );
-                          } else if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('签名失败或已取消，请检查钱包。'),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
+                              );
+                            }
+                          } else {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('签名未完成或已被拒绝。'),
+                                  backgroundColor: Colors.orange,
+                                ),
+                              );
+                            }
                           }
                         } finally {
                           if (mounted) {
