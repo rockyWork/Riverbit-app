@@ -6,6 +6,7 @@ import 'pages/profile_page.dart';
 import 'services/wallet_service.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const MyApp());
 }
 

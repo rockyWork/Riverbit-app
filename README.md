@@ -28,3 +28,7 @@ flutter clean
 flutter build apk
 
 stop-process -name java -Force 杀死java  JDK 进程
+
+安卓打包输出的路径：flutter-demo\build\app\outputs\flutter-apk\
+
+要隐藏有关已过时选项的警告, 请使用 -Xlint:-options
