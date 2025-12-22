@@ -15,6 +15,8 @@ For help getting started with Flutter development, view the
 [online documentation](https://docs.flutter.dev/), which offers tutorials,
 samples, guidance on mobile development, and a full API reference.
 
+flutter pub get  拉取依赖
+
 flutter build apk --release  打安卓的app  包
 
 adb devices  查看真机调试设备号
